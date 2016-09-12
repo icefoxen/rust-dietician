@@ -23,7 +23,8 @@ enum SymbolClass {
 #[derive(Debug, Clone)]
 struct Symbol {
     name: String,
-    class: SymbolClass
+    class: SymbolClass,
+    size: u64,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -128,6 +129,18 @@ fn find_section_class_sizes(sections: &Vec<Section>) -> HashMap<SectionClass, u6
     map
 }
 
+fn find_symbol_class_sizes(sections: &Vec<Section>) -> HashMap<SymbolClass, u64> {
+    let mut map = HashMap::new();
+    for section in sections {
+        for symbol in &section.symbols {
+            let entry: &mut u64 = map.entry(symbol.class).or_insert(0);
+            *entry = *entry + symbol.size;
+        }
+    }
+    map
+}
+
+
 /// Takes a Vec<Section> and goes through all symbols in all sections,
 /// updating the symbol list for each Section.
 fn resolve_symbols(file: elf::File, sections: &mut Vec<Section>) {
@@ -145,10 +158,42 @@ fn resolve_symbols(file: elf::File, sections: &mut Vec<Section>) {
             let new_sym = Symbol {
                 name: sym.name.clone(),
                 class: symbol_class_from_name(sym.name.as_str(), &our_section.class),
+                size: sym.size,
             };
             our_section.symbols.push(new_sym);
         }
     }
+}
+
+fn round_up_to_kb(num: u64) -> u64 {
+    (num+1024) / 1024
+}
+
+fn summarize_sections(sections: &Vec<Section>) {
+    println!("Symbol info:");
+    let symbol_sizes = find_symbol_class_sizes(&sections);
+    for (key, val) in symbol_sizes.iter() {
+        println!("{:?} {} Kb", key, round_up_to_kb(*val));
+    }
+    println!("");
+
+    println!("Section info:");
+    let section_sizes = find_section_class_sizes(&sections);
+    for (key, val) in section_sizes.iter() {
+        println!("{:?} {} Kb", key, round_up_to_kb(*val));
+    }
+    println!("");
+
+    let symbol_size = symbol_sizes.values()
+        .fold(0, |x,y| x+y);
+    println!("Size of all symbol info: {} Kb", round_up_to_kb(symbol_size));
+
+
+    let total_size = sections.iter()
+        .map(|section| section.size)
+        .fold(0, |x,y| x+y);
+    println!("Total size: {} Kb", round_up_to_kb(total_size));
+
 }
 
 fn analyze_file(file: elf::File) {
@@ -156,22 +201,14 @@ fn analyze_file(file: elf::File) {
         .map(|section| Section::from_elf_file(&file, &section.shdr))
         .collect();
     resolve_symbols(file, &mut sections);
-    for section in &sections {
-        println!("{}, class {:?}", section.name, section.class);
-        for sym in &section.symbols {
-            println!("  Symbol {}, class {:?}", sym.name, sym.class);
-        }
-    }
+    // for section in &sections {
+    //     println!("{}, class {:?}", section.name, section.class);
+    //     for sym in &section.symbols {
+    //         println!("  Symbol {}, class {:?}", sym.name, sym.class);
+    //     }
+    // }
 
-    let sizes = find_section_class_sizes(&sections);
-    for (key, val) in sizes.iter() {
-        println!("{:?} {} Kb", key, val / 1024);
-    }
-    
-    let total_size = &sections.iter()
-        .map(|section| section.size)
-        .fold(0, |x,y| x+y);
-    println!("Total size: {} Kb", total_size / 1024);
+    summarize_sections(&sections);
 }
 
 fn main() {
