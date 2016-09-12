@@ -1,0 +1,8 @@
+[package]
+name = "rust-dietician"
+version = "0.1.0"
+authors = ["Simon Heath <icefoxen@gmail.com>"]
+
+[dependencies]
+
+elf = "*"
