@@ -4,9 +4,26 @@ use std::env;
 use std::path::PathBuf;
 use std::collections::HashMap;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum SymbolClass {
+    RustFunction,
+    RustData,
+    CFunction,
+    CData,
+    DataConst,
+    DataStr,
+    DataRef,
+    PanicLoc,
+    ExceptTable,
+    VTable,
+    SystemInfo,
+    Other,
+}
+
 #[derive(Debug, Clone)]
 struct Symbol {
-    name: String
+    name: String,
+    class: SymbolClass
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -17,6 +34,40 @@ enum SectionClass {
     Metadata,
     Other,
 }
+
+
+fn symbol_class_from_name(name: &str, section: &SectionClass) -> SymbolClass {
+    // We might need the section class here too, so we can separate
+    // a function called "const1" with a constant called "const1"
+    match name {
+        x if x.starts_with("_ZN") => {
+            if *section == SectionClass::Code {
+                SymbolClass::RustFunction
+            } else {
+                SymbolClass::RustData
+            }
+        },
+        x if x.starts_with("const") => SymbolClass::DataConst,
+        x if x.starts_with("str") => SymbolClass::DataStr,
+        x if x.starts_with("ref") => SymbolClass::DataRef,
+        x if x.starts_with("GCC_except_table") => SymbolClass::ExceptTable,
+        x if x.starts_with("panic_") => SymbolClass::PanicLoc,
+        x if x.starts_with("vtable") => SymbolClass::VTable,
+        x if x.starts_with("ref") => SymbolClass::Other,
+        x if x.starts_with("__") => SymbolClass::SystemInfo,
+        _ => {
+            if *section == SectionClass::Code {
+                SymbolClass::CFunction
+            } else {
+                SymbolClass::CData
+            }
+        },
+    }
+
+}
+
+
+
 
 fn section_class_from_name(name: &str) -> SectionClass {
     match name {
@@ -73,7 +124,6 @@ fn find_section_class_sizes(sections: &Vec<Section>) -> HashMap<SectionClass, u6
     for s in sections {
         let entry: &mut u64 = map.entry(s.class).or_insert(0);
         *entry = *entry + s.size;
-        //entry.insert(entry.get() + s.size);
     }
     map
 }
@@ -92,8 +142,9 @@ fn resolve_symbols(file: elf::File, sections: &mut Vec<Section>) {
                 continue;
             }
             let ref mut our_section = sections[section_offset];
-            let new_sym = Symbol{
-                name: sym.name.clone()
+            let new_sym = Symbol {
+                name: sym.name.clone(),
+                class: symbol_class_from_name(sym.name.as_str(), &our_section.class),
             };
             our_section.symbols.push(new_sym);
         }
@@ -106,18 +157,21 @@ fn analyze_file(file: elf::File) {
         .collect();
     resolve_symbols(file, &mut sections);
     for section in &sections {
-        println!("{:?}, class {:?}", section.name, section.class);
+        println!("{}, class {:?}", section.name, section.class);
+        for sym in &section.symbols {
+            println!("  Symbol {}, class {:?}", sym.name, sym.class);
+        }
     }
 
     let sizes = find_section_class_sizes(&sections);
     for (key, val) in sizes.iter() {
-        println!("{:?} {}", key, val);
+        println!("{:?} {} Kb", key, val / 1024);
     }
     
     let total_size = &sections.iter()
         .map(|section| section.size)
         .fold(0, |x,y| x+y);
-    println!("Total size: {}", total_size);
+    println!("Total size: {} Kb", total_size / 1024);
 }
 
 fn main() {
