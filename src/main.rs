@@ -201,18 +201,19 @@ fn analyze_file(file: elf::File) {
         .map(|section| Section::from_elf_file(&file, &section.shdr))
         .collect();
     resolve_symbols(file, &mut sections);
-    // for section in &sections {
-    //     println!("{}, class {:?}", section.name, section.class);
-    //     for sym in &section.symbols {
-    //         println!("  Symbol {}, class {:?}", sym.name, sym.class);
-    //     }
-    // }
+    for section in &sections {
+        println!("{}, class {:?}", section.name, section.class);
+        for sym in &section.symbols {
+            println!("  Symbol {}, class {:?}", sym.name, sym.class);
+        }
+    }
 
     summarize_sections(&sections);
 }
 
 fn main() {
-    let path = PathBuf::from("target/debug/rust-dietician");
+    let path = PathBuf::from("/home/icefox/.cargo/bin/rustc");
+    //let path = PathBuf::from("target/debug/rust-dietician");
     let file = match elf::File::open_path(&path) {
         Ok(f) => f,
         Err(e) => panic!("Error: {:?}", e),
