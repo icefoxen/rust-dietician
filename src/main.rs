@@ -3,6 +3,41 @@ extern crate elf;
 use std::env;
 use std::path::PathBuf;
 
+fn analyze_file(file: elf::File) {
+    for section in &file.sections {
+        println!("{}\n", section);
+
+        let symbols = file.get_symbols(section).unwrap();
+        for symbol in symbols {
+            println!("{}", symbol);
+        }
+        println!("");
+    }
+    /*
+    match file.get_section(".text") {
+        Some(s) => {
+            let symbols = file.get_symbols(s).unwrap();
+            println!("Symbols: {}", symbols.len());
+
+        }
+        None => panic!("Failed to look up .text section"),
+    };
+
+    match file.get_section(".dynsym") {
+        Some(s) => {
+            println!("Section .text: {}\n", s);
+            let symbols = file.get_symbols(s).unwrap();
+            println!("Symbols: {}", symbols.len());
+            for symbol in symbols {
+                println!("Symbol: {}", symbol);
+            }
+        }
+        None => panic!("Failed to look up .text section"),
+    };
+*/
+
+}
+
 fn main() {
     
     println!("Hello, world!");
@@ -12,8 +47,5 @@ fn main() {
         Err(e) => panic!("Error: {:?}", e),
     };
     
-    let text_scn = match file.get_section(".text") {
-        Some(s) => println!("{}", s),
-        None => panic!("Failed to look up .text section"),
-    };
+    analyze_file(file)
 }

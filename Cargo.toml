@@ -5,4 +5,4 @@ authors = ["Simon Heath <icefoxen@gmail.com>"]
 
 [dependencies]
 
-elf = "*"
+elf = { git = "https://github.com/cole14/rust-elf.git" }
