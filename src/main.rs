@@ -1,7 +1,6 @@
 use std::env;
 use std::fmt;
 use std::path::PathBuf;
-//use std::collections::HashMap;
 use std::collections::BTreeMap;
 
 extern crate clap;
@@ -226,6 +225,8 @@ fn analyze_file(file: elf::File, verbosity: u64) {
         .collect();
     resolve_symbols(file, &mut sections);
 
+    summarize_sections(&sections);
+    
     if verbosity > 0 {
         // Print sections
         for section in &sections {
@@ -239,8 +240,6 @@ fn analyze_file(file: elf::File, verbosity: u64) {
         }
         println!("");
     }
-
-    summarize_sections(&sections);
 }
 
 fn main() {
