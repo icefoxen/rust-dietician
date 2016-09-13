@@ -198,17 +198,18 @@ fn summarize_sections(sections: &Vec<Section>) {
 
 }
 
-// BUGGO: print_sections == false and print_symbols == true is an invalid state
-fn analyze_file(file: elf::File, print_sections: bool, print_symbols: bool) {
+fn analyze_file(file: elf::File, verbosity: u64) {
     let mut sections: Vec<Section> = file.sections.iter()
         .map(|section| Section::from_elf_file(&section.shdr))
         .collect();
     resolve_symbols(file, &mut sections);
 
-    if print_sections {
+    if verbosity > 0 {
+        // Print sections
         for section in &sections {
             println!("Section '{}', class {:?}", section.name, section.class);
-            if print_symbols {
+            if verbosity > 1 {
+                // Print symbols in each section
                 for sym in &section.symbols {
                     println!("  Symbol {}, class {:?}", sym.name, sym.class);
                 }
@@ -226,9 +227,13 @@ fn main() {
         .author("Simon Heath <icefoxen@gmail.com>")
         .about("Prints out a summary of why your Rust binary is so fat")
         .arg(Arg::with_name("INPUT")
-             .help("The input binary to read")
-             .required(false)
-        )
+             .help("The input binary to read (defaults to the rust-dietician binary if not specified)")
+             .required(false))
+        .arg(Arg::with_name("v")
+             .short("v")
+             .multiple(true)
+             .help("Verbose mode (-v prints sections, -vv prints sections and symbols)")
+             .required(false))
         .get_matches();
 
     // If there is no input file given, we use the current binary
@@ -238,6 +243,9 @@ fn main() {
         None => env::current_exe().unwrap(),
     };
 
+    let verbosity = matches.occurrences_of("v");
+
+
     if target_file.is_file() {
         println!("Reading file {:?}", target_file);
         let file = match elf::File::open_path(&target_file) {
@@ -245,7 +253,7 @@ fn main() {
             Err(e) => panic!("Error: {:?}", e),
         };
         
-        analyze_file(file, false, false);
+        analyze_file(file, verbosity);
     } else {
         println!("Error: could not open file {:?}?", target_file);
     };
