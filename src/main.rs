@@ -1,8 +1,10 @@
-extern crate elf;
-
 use std::env;
 use std::path::PathBuf;
 use std::collections::HashMap;
+
+extern crate clap;
+use clap::{Arg, App};
+extern crate elf;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum SymbolClass {
@@ -110,7 +112,7 @@ struct Section {
 }
 
 impl Section {
-    fn from_elf_file(file: &elf::File, section: &elf::types::SectionHeader) -> Section {
+    fn from_elf_file(section: &elf::types::SectionHeader) -> Section {
         Section {
             name: section.name.clone(),
             class: section_class_from_name(section.name.as_str()),
@@ -170,16 +172,16 @@ fn round_up_to_kb(num: u64) -> u64 {
 }
 
 fn summarize_sections(sections: &Vec<Section>) {
-    println!("Symbol info:");
-    let symbol_sizes = find_symbol_class_sizes(&sections);
-    for (key, val) in symbol_sizes.iter() {
+    println!("Section size breakdown:");
+    let section_sizes = find_section_class_sizes(&sections);
+    for (key, val) in section_sizes.iter() {
         println!("{:?} {} Kb", key, round_up_to_kb(*val));
     }
     println!("");
-
-    println!("Section info:");
-    let section_sizes = find_section_class_sizes(&sections);
-    for (key, val) in section_sizes.iter() {
+    
+    println!("Symbol size breakdown:");
+    let symbol_sizes = find_symbol_class_sizes(&sections);
+    for (key, val) in symbol_sizes.iter() {
         println!("{:?} {} Kb", key, round_up_to_kb(*val));
     }
     println!("");
@@ -196,28 +198,55 @@ fn summarize_sections(sections: &Vec<Section>) {
 
 }
 
-fn analyze_file(file: elf::File) {
+// BUGGO: print_sections == false and print_symbols == true is an invalid state
+fn analyze_file(file: elf::File, print_sections: bool, print_symbols: bool) {
     let mut sections: Vec<Section> = file.sections.iter()
-        .map(|section| Section::from_elf_file(&file, &section.shdr))
+        .map(|section| Section::from_elf_file(&section.shdr))
         .collect();
     resolve_symbols(file, &mut sections);
-    for section in &sections {
-        println!("{}, class {:?}", section.name, section.class);
-        for sym in &section.symbols {
-            println!("  Symbol {}, class {:?}", sym.name, sym.class);
+
+    if print_sections {
+        for section in &sections {
+            println!("Section '{}', class {:?}", section.name, section.class);
+            if print_symbols {
+                for sym in &section.symbols {
+                    println!("  Symbol {}, class {:?}", sym.name, sym.class);
+                }
+            }
         }
+        println!("");
     }
 
     summarize_sections(&sections);
 }
 
 fn main() {
-    let path = PathBuf::from("/home/icefox/.cargo/bin/rustc");
-    //let path = PathBuf::from("target/debug/rust-dietician");
-    let file = match elf::File::open_path(&path) {
-        Ok(f) => f,
-        Err(e) => panic!("Error: {:?}", e),
+    let matches = App::new("rust-dietician")
+        .version("0.1")
+        .author("Simon Heath <icefoxen@gmail.com>")
+        .about("Prints out a summary of why your Rust binary is so fat")
+        .arg(Arg::with_name("INPUT")
+             .help("The input binary to read")
+             .required(false)
+        )
+        .get_matches();
+
+    // If there is no input file given, we use the current binary
+    let cmd_line_path = matches.value_of("INPUT");
+    let target_file = match cmd_line_path {
+        Some(path) => PathBuf::from(path),
+        None => env::current_exe().unwrap(),
     };
-    
-    analyze_file(file)
+
+    if target_file.is_file() {
+        println!("Reading file {:?}", target_file);
+        let file = match elf::File::open_path(&target_file) {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {:?}", e),
+        };
+        
+        analyze_file(file, false, false);
+    } else {
+        println!("Error: could not open file {:?}?", target_file);
+    };
 }
