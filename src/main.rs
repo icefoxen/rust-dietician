@@ -1,25 +1,47 @@
 use std::env;
+use std::fmt;
 use std::path::PathBuf;
-use std::collections::HashMap;
+//use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 extern crate clap;
 use clap::{Arg, App};
 extern crate elf;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum SymbolClass {
-    RustFunction,
-    RustData,
     CFunction,
     CData,
     DataConst,
     DataStr,
     DataRef,
-    PanicLoc,
     ExceptTable,
-    VTable,
+    PanicLoc,
+    RustFunction,
+    RustData,
     SystemInfo,
+    VTable,
     Other,
+}
+
+impl fmt::Display for SymbolClass {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match *self {
+            SymbolClass::CFunction => "C functions",
+            SymbolClass::CData => "C data",
+            SymbolClass::DataConst => "Consts",
+            SymbolClass::DataStr => "Strings",
+            SymbolClass::DataRef => "Refs",
+            SymbolClass::ExceptTable => "Exception tables",
+            SymbolClass::PanicLoc => "Panic locations",
+            SymbolClass::RustFunction => "Rust functions",
+            SymbolClass::RustData => "Misc. Rust data",
+            SymbolClass::SystemInfo => "Sytem info",
+            SymbolClass::VTable => "VTables",
+            SymbolClass::Other => "Other info",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -29,7 +51,7 @@ struct Symbol {
     size: u64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum SectionClass {
     Code,
     Data,
@@ -122,8 +144,8 @@ impl Section {
     }
 }
 
-fn find_section_class_sizes(sections: &Vec<Section>) -> HashMap<SectionClass, u64> {
-    let mut map = HashMap::new();
+fn find_section_class_sizes(sections: &Vec<Section>) -> BTreeMap<SectionClass, u64> {
+    let mut map = BTreeMap::new();
     for s in sections {
         let entry: &mut u64 = map.entry(s.class).or_insert(0);
         *entry = *entry + s.size;
@@ -131,8 +153,8 @@ fn find_section_class_sizes(sections: &Vec<Section>) -> HashMap<SectionClass, u6
     map
 }
 
-fn find_symbol_class_sizes(sections: &Vec<Section>) -> HashMap<SymbolClass, u64> {
-    let mut map = HashMap::new();
+fn find_symbol_class_sizes(sections: &Vec<Section>) -> BTreeMap<SymbolClass, u64> {
+    let mut map = BTreeMap::new();
     for section in sections {
         for symbol in &section.symbols {
             let entry: &mut u64 = map.entry(symbol.class).or_insert(0);
@@ -175,14 +197,14 @@ fn summarize_sections(sections: &Vec<Section>) {
     println!("Section size breakdown:");
     let section_sizes = find_section_class_sizes(&sections);
     for (key, val) in section_sizes.iter() {
-        println!("{:?} {} Kb", key, round_up_to_kb(*val));
+        println!("{:18} {:>5} Kb", format!("{:?}",key), round_up_to_kb(*val));
     }
     println!("");
     
     println!("Symbol size breakdown:");
     let symbol_sizes = find_symbol_class_sizes(&sections);
     for (key, val) in symbol_sizes.iter() {
-        println!("{:?} {} Kb", key, round_up_to_kb(*val));
+        println!("{:18} {:>5} Kb", format!("{}",key), round_up_to_kb(*val));
     }
     println!("");
 
