@@ -115,3 +115,4 @@ Should be able to just check it out and build it with `cargo build`.
 * Break down rust symbol names so it can give you stats by module
 * Try to give stats for function specializations
 * Try to break it
+* Make it callable via `cargo dietician`

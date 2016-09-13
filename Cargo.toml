@@ -7,3 +7,4 @@ authors = ["Simon Heath <icefoxen@gmail.com>"]
 
 elf = { git = "https://github.com/cole14/rust-elf.git" }
 clap = "2"
+rustc-demangle = "0.1"

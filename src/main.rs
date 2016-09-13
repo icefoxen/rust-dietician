@@ -6,6 +6,9 @@ use std::collections::BTreeMap;
 extern crate clap;
 use clap::{Arg, App};
 extern crate elf;
+extern crate rustc_demangle;
+use rustc_demangle::demangle;
+
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum SymbolClass {
@@ -219,6 +222,17 @@ fn summarize_sections(sections: &Vec<Section>) {
 
 }
 
+fn print_rust_symbols(sections: &Vec<Section>) {
+    println!("Rust symbols:");
+    for section in sections {
+        for sym in &section.symbols {
+            if sym.class == SymbolClass::RustData || sym.class == SymbolClass::RustFunction {
+                println!("Rust symbol:  {}", demangle(&sym.name));
+            }
+        }
+    }
+}
+
 fn analyze_file(file: elf::File, verbosity: u64) {
     let mut sections: Vec<Section> = file.sections.iter()
         .map(|section| Section::from_elf_file(&section.shdr))
@@ -226,6 +240,10 @@ fn analyze_file(file: elf::File, verbosity: u64) {
     resolve_symbols(file, &mut sections);
 
     summarize_sections(&sections);
+
+    println!("");
+
+    print_rust_symbols(&sections);
     
     if verbosity > 0 {
         // Print sections
